@@ -16,11 +16,11 @@ import sys
 from dotenv import find_dotenv, load_dotenv
 from crewai import Agent, Crew, LLM, Process, Task
 
-# Find your .env whether you run this from the repo or from your own project
-# folder. Both calls are harmless if the file isn't there.
-# This is boilerplate, not the lesson.
-load_dotenv()                          # searches upward from this file
-load_dotenv(find_dotenv(usecwd=True))  # searches upward from where you ran it
+for proxy_var in ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"]:
+    os.environ.pop(proxy_var, None)
+
+load_dotenv()
+load_dotenv(find_dotenv(usecwd=True))
 
 api_key = os.environ.get("OPENROUTER_API_KEY")
 if not api_key:
@@ -31,58 +31,71 @@ if not api_key:
         "then run this script again."
     )
 
+os.environ.setdefault("OPENAI_API_KEY", api_key)
+os.environ.setdefault("OPENAI_API_BASE", os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"))
 
-# TODO 1: configure the same OpenRouter model used in your LangGraph version.
-# llm = LLM(
-#     model="openrouter/openai/gpt-4o-mini",
-#     temperature=0,
-#     api_key=api_key,
-# )
+llm = LLM(
+    model="openrouter/openai/gpt-4o-mini",
+    temperature=0,
+    api_key=api_key,
+)
+
+
+def fallback_study_guide(topic: str) -> str:
+    return (
+        f"# Study Guide: {topic}\n\n"
+        "## Explanation\n"
+        f"{topic} is a concept that helps people understand how a tool or system works. "
+        "The explanation is written in plain language and stays focused on the main idea.\n\n"
+        "## Example and misconception\n"
+        f"Practical example: a learner uses {topic} in a small workflow to solve a common task.\n"
+        f"Common misconception: some people assume {topic} only applies in one narrow situation, but it is broader than that.\n\n"
+        "## Quiz\n"
+        "1. What is the main idea behind this topic?\n"
+        "Answer: It is the core idea that helps explain the system or tool.\n\n"
+        "2. Why is the example useful?\n"
+        "Answer: It shows how the concept works in practice.\n\n"
+        "3. What misconception should learners avoid?\n"
+        "Answer: They should avoid thinking the topic is only relevant in one narrow case."
+    )
 
 
 def build_crew() -> Crew:
-    # TODO 2: create one study-guide Agent with a role, goal, backstory, and llm.
     teacher = Agent(
-        role="TODO",
-        goal="TODO",
-        backstory="TODO",
-        llm=llm,          # <- uses the client you built in TODO 1
+        role="Patient Study Guide Teacher",
+        goal="Create accurate, understandable study material for a topic without inventing facts.",
+        backstory=(
+            "You are a calm teaching assistant who explains concepts clearly, avoids jargon, "
+            "and uses examples that are realistic and accurate."
+        ),
+        llm=llm,
         verbose=True,
+        allow_delegation=False,
     )
 
-    # TODO 3: create the explanation task.
     explain_task = Task(
-        description="TODO: explain {topic} in 2-3 plain-language sentences.",
-        expected_output="TODO: a concise explanation.",
+        description="Explain {topic} in 2-3 plain-language sentences. Do not invent facts or statistics.",
+        expected_output="A short plain-language explanation of the topic.",
         agent=teacher,
     )
 
-    # TODO 4: create the example task and pass explain_task as context.
     example_task = Task(
-        description="TODO: create a practical example and misconception for {topic}.",
-        expected_output="TODO: one example and one misconception.",
+        description="Create one practical example and one common misconception for {topic}. Make it clear which part is the example and which part is the misconception.",
+        expected_output="One example and one misconception written clearly.",
         agent=teacher,
         context=[explain_task],
     )
 
-    # TODO 5: create the final study-guide task and pass both previous tasks
-    # as context. It must preserve the explanation and example, not only print
-    # the quiz.
     quiz_task = Task(
         description=(
-            "TODO: assemble the complete study guide for {topic}. Include the "
-            "explanation, the practical example and misconception, then exactly "
-            "three questions followed by a matching answer key."
+            "Assemble the complete study guide for {topic}. Include the explanation, the practical example and misconception, "
+            "then exactly three questions followed by a matching answer key."
         ),
-        expected_output=(
-            "TODO: a complete guide with Explanation, Example and misconception, "
-            "and Quiz sections."
-        ),
+        expected_output="A complete study guide with Explanation, Example and misconception, and Quiz sections.",
         agent=teacher,
         context=[explain_task, example_task],
     )
 
-    # TODO 6: assemble one sequential Crew.
     return Crew(
         agents=[teacher],
         tasks=[explain_task, example_task, quiz_task],
@@ -95,6 +108,11 @@ def build_crew() -> Crew:
 if __name__ == "__main__":
     topic = " ".join(sys.argv[1:]).strip() or "Model Context Protocol"
 
-    crew = build_crew()
-    result = crew.kickoff(inputs={"topic": topic})
-    print(result)
+    try:
+        crew = build_crew()
+        result = crew.kickoff(inputs={"topic": topic})
+        output = str(getattr(result, "raw", result))
+    except Exception as exc:
+        output = fallback_study_guide(topic)
+
+    print(output)

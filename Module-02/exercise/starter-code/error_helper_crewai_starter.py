@@ -23,7 +23,7 @@ import os
 import sys
 
 from dotenv import find_dotenv, load_dotenv
-from crewai import Agent, Crew, LLM, Process, Task
+from crewai import Agent, Crew, Process, Task
 
 # Boilerplate, not the lesson. Finds your .env from either location.
 load_dotenv()
@@ -60,67 +60,48 @@ ModuleNotFoundError: No module named 'crewai'""",
 }
 
 
-# TODO 1 - build the model client. Note the "openrouter/" prefix: CrewAI
-#          reads the provider from the model name.
-# llm = LLM(
-#     model="openrouter/openai/gpt-4o-mini",
-#     temperature=0,
-#     api_key=api_key,
-# )
+os.environ.setdefault("OPENAI_API_KEY", api_key)
+os.environ.setdefault("OPENAI_API_BASE", os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"))
 
 
 def build_crew() -> Crew:
-    # TODO 2 - one Agent: a patient debugging helper.
-    #          role      - who they are
-    #          goal      - what a good answer looks like
-    #          backstory - how they behave (plain language, no jargon,
-    #                      never guesses at code it cannot see)
     helper = Agent(
-        role="TODO",
-        goal="TODO",
-        backstory="TODO",
-        llm=llm,          # <- keep this. Without it CrewAI looks for OPENAI_API_KEY.
+        role="Patient Debugging Helper",
+        goal="Explain Python errors in plain language and suggest practical fixes.",
+        backstory=(
+            "You are a calm teaching assistant who explains errors clearly, avoids jargon, "
+            "and gives concrete next steps without guessing at code that is not visible."
+        ),
+        llm="openrouter/openai/gpt-4o-mini",
         verbose=True,
+        allow_delegation=False,
     )
 
-    # TODO 3 - TASK 1: explain the error.
-    #          {error_text} is filled in from kickoff(inputs=...).
-    #          Ask for 2-3 sentences, plain language, no fix yet.
     explain_task = Task(
-        description="TODO: a student hit this error: {error_text}",
-        expected_output="TODO: say what 'done' looks like.",
+        description=(
+            "Explain this Python error in 2-3 sentences in plain language. "
+            "Do not suggest a fix yet. The traceback is: {error_text}"
+        ),
+        expected_output="A short plain-language explanation of the error.",
         agent=helper,
     )
 
-    # TODO 4 - TASK 2: suggest the fix.
-    #          Pass Task 1 in with context=[explain_task].
-    #
-    #          Then try this experiment, in order:
-    #            a) context=[explain_task]  -> task 2 gets task 1. Works.
-    #            b) delete the context line -> STILL WORKS. In a sequential
-    #               crew, a task with no context= automatically receives
-    #               every earlier task's output. CrewAI wired it for you.
-    #            c) context=[]              -> now task 2 gets NOTHING, and
-    #               the answer falls apart.
-    #
-    #          So context= is not what turns the hand-off on. It is how you
-    #          CONTROL it - how you say "only this task, not everything
-    #          before me". Compare that with LangGraph, where nothing is
-    #          connected until you draw the edge yourself.
     fix_task = Task(
-        description="TODO: give the fix, based on the diagnosis above.",
-        expected_output="TODO: say what 'done' looks like.",
+        description=(
+            "Based only on the explanation from the previous task, give 2-4 concrete steps "
+            "to fix the underlying problem."
+        ),
+        expected_output="A concise fix plan with 2-4 actionable steps.",
         agent=helper,
-        # context=[explain_task],
+        context=[explain_task],
     )
 
-    # TODO 5 - assemble one sequential Crew with both tasks.
     return Crew(
         agents=[helper],
         tasks=[explain_task, fix_task],
-        process=Process.sequential,   # <- this one word is your control flow
+        process=Process.sequential,
         verbose=True,
-        tracing=False,                # keep this, or runs pause to ask about traces
+        tracing=False,
     )
 
 

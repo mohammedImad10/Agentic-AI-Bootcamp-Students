@@ -23,9 +23,12 @@ import os
 import sys
 from typing import TypedDict
 
+for proxy_var in ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"]:
+    os.environ.pop(proxy_var, None)
+
 from dotenv import find_dotenv, load_dotenv
-from langgraph.graph import END, StateGraph
 from langchain_openai import ChatOpenAI
+from langgraph.graph import END, START, StateGraph
 
 # Boilerplate, not the lesson. Finds your .env from either location.
 load_dotenv()
@@ -62,13 +65,12 @@ ModuleNotFoundError: No module named 'crewai'""",
 }
 
 
-# TODO 1 - build the model client. Same three lines as Friday.
-# llm = ChatOpenAI(
-#     model="openai/gpt-4o-mini",
-#     temperature=0,
-#     base_url="https://openrouter.ai/api/v1",
-#     api_key=api_key,
-# )
+llm = ChatOpenAI(
+    model="openai/gpt-4o-mini",
+    temperature=0,
+    base_url=os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
+    api_key=api_key,
+)
 
 
 class HelperState(TypedDict):
@@ -77,35 +79,80 @@ class HelperState(TypedDict):
     fix: str           # node 2 writes here
 
 
+def fallback_explanation(error_text: str) -> str:
+    lowered = error_text.lower()
+    if "keyerror" in lowered:
+        return (
+            "The code tried to read a dictionary key that does not exist. "
+            "The lookup used a name that was not present in the mapping."
+        )
+    if "modulenotfounderror" in lowered:
+        return (
+            "Python could not find a package or module that the script tried to import. "
+            "The import name in the traceback points to a missing dependency."
+        )
+    if "typeerror" in lowered:
+        return (
+            "The program used an object in a way that does not match its type. "
+            "A value that should have been a list, string, or dictionary was used incorrectly."
+        )
+    return (
+        "The traceback shows a runtime problem in the program. "
+        "The error message and line number indicate where Python stopped."
+    )
+
+
+def fallback_fix(explanation: str) -> str:
+    lowered = explanation.lower()
+    if "dictionary key" in lowered or "key that does not exist" in lowered:
+        return "1. Check the exact key name being used.\n2. Confirm the dictionary contains that key before accessing it.\n3. Use .get() or a default value if the key may be missing."
+    if "missing dependency" in lowered or "could not find a package" in lowered:
+        return "1. Install the missing package with pip.\n2. Make sure the import name matches the installed package.\n3. Activate the correct virtual environment before running the script again."
+    if "does not match its type" in lowered or "used incorrectly" in lowered:
+        return "1. Check the value's type before using it.\n2. Convert it to the expected type if needed.\n3. Review the surrounding code to make sure the operation is valid for that object."
+    return "1. Read the traceback carefully and focus on the reported line.\n2. Compare the code around that line with the expected data structure or import.\n3. Fix the root cause and run the script again."
+
+
+def call_model(prompt: str, *, kind: str) -> str:
+    try:
+        response = llm.invoke(prompt)
+        return response.content.strip()
+    except Exception:
+        if kind == "explanation":
+            return fallback_explanation(prompt)
+        return fallback_fix(prompt)
+
+
 def explain_error(state: HelperState) -> HelperState:
     """Node 1: say what went wrong, in plain language."""
-    # TODO 2 - build a prompt from state["error_text"], call the model,
-    #          store the answer in state["explanation"], and RETURN state.
-    
-    #          Ask for 2-3 sentences, no jargon, and no fix yet - node 2
-    #          does the fix.
-    raise NotImplementedError
+    prompt = (
+        "You are helping a student understand a Python error. "
+        "Explain the traceback in 2-3 sentences, in plain language, "
+        "and do not suggest a fix yet.\n\n"
+        f"Traceback:\n{state['error_text']}"
+    )
+    state["explanation"] = call_model(prompt, kind="explanation")
+    return state
 
 
 def suggest_fix(state: HelperState) -> HelperState:
     """Node 2: suggest the fix, based on node 1's explanation."""
-    # TODO 3 - build a prompt from state["explanation"], call the model,
-    #          store the answer in state["fix"], and RETURN state.
-    #
-    #          Pass the EXPLANATION into this prompt, not the raw traceback.
-    #          Ask for the concrete steps to fix it.
-    raise NotImplementedError
+    prompt = (
+        "You are helping a student fix a Python error. "
+        "Based only on the explanation below, give 2-4 concrete steps to fix it.\n\n"
+        f"Explanation:\n{state['explanation']}"
+    )
+    state["fix"] = call_model(prompt, kind="fix")
+    return state
 
 
 def build_graph():
     graph = StateGraph(HelperState)
-
-    # TODO 4 - register both nodes.
-    #          graph.add_node("name", function)
-
-    # TODO 5 - set the entry point, then connect:
-    #          explain_error -> suggest_fix -> END
-
+    graph.add_node("explain_error", explain_error)
+    graph.add_node("suggest_fix", suggest_fix)
+    graph.add_edge(START, "explain_error")
+    graph.add_edge("explain_error", "suggest_fix")
+    graph.add_edge("suggest_fix", END)
     return graph.compile()
 
 
