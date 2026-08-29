@@ -60,13 +60,11 @@ if not api_key:
     )
 
 
-# TODO 1 - build the model client. Same model as your LangGraph version, so
-#          the comparison is honest. Note the "openrouter/" prefix.
-# llm = LLM(
-#     model="openrouter/openai/gpt-4o-mini",
-#     temperature=0,
-#     api_key=api_key,
-# )
+llm = LLM(
+    model="openrouter/openai/gpt-4o-mini",
+    temperature=0,
+    api_key=api_key,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -74,51 +72,27 @@ if not api_key:
 # ---------------------------------------------------------------------------
 # In LangGraph the tool was a plain function call inside a node - YOU decided
 # when it ran. Here you hand the tool to an agent and the agent decides.
-#
-# TODO 2 - finish the docstring below.
-#
-#          The docstring is NOT a comment. It is the description the model
-#          reads when deciding whether to use this tool, and what to pass it.
-#          Write it for the model, not for yourself.
-#
-#          It should say what the tool searches, that it returns findings with
-#          source URLs, and that it can return the exact text NO_RESULTS or
-#          SEARCH_UNAVAILABLE.
 @tool("Web Search")
 def search_web(query: str) -> str:
-    """TODO: describe this tool for the model."""
+    """Search the web for the given query and return factual findings with source URLs. The tool may return a numbered list of evidence, or the exact text NO_RESULTS if nothing relevant was found, or SEARCH_UNAVAILABLE if the search service could not run. Use the returned evidence directly and do not invent missing facts."""
     return web_search(query)
 
 
 def build_crew() -> Crew:
-    # TODO 3 - the researcher. This is the agent that HOLDS THE TOOL.
-    #          role      - who they are
-    #          goal      - what a good result looks like
-    #          backstory - how they behave. Make it explicit that they report
-    #                      what the search actually returned, keep the source
-    #                      URLs, and say so plainly on NO_RESULTS instead of
-    #                      filling the silence from memory.
-    #          tools     - [search_web]
-    #          llm       - keep this, or CrewAI goes looking for OPENAI_API_KEY
-    #          max_iter  - a hard cap, so a confused agent cannot loop forever
     researcher = Agent(
-        role="TODO",
-        goal="TODO",
-        backstory="TODO",
+        role="Research Analyst",
+        goal="Find evidence for the user question using the web search tool and report the exact results with source URLs.",
+        backstory="You are a careful researcher. You report what the search actually returned, keep the source URLs, and say plainly when the result is NO_RESULTS or SEARCH_UNAVAILABLE rather than guessing from memory.",
         tools=[search_web],
         llm=llm,
         verbose=True,
         max_iter=4,
     )
 
-    # TODO 4 - the writer. No tools. It only ever sees what it is given.
-    #          Its backstory should make clear it would rather hand back
-    #          "we could not verify this" than something that reads well and
-    #          might be wrong.
     writer = Agent(
-        role="TODO",
-        goal="TODO",
-        backstory="TODO",
+        role="Evidence Writer",
+        goal="Answer only when the evidence supports the claim; otherwise say the claim could not be verified.",
+        backstory="You prefer an honest statement about missing evidence over a confident but unsupported answer. You cite sources and keep the wording brief.",
         llm=llm,
         verbose=True,
         max_iter=4,
@@ -127,48 +101,21 @@ def build_crew() -> Crew:
     # -----------------------------------------------------------------------
     # THE TASKS
     # -----------------------------------------------------------------------
-    # Notice there is NO agent= on either task. In a hierarchical crew the
-    # manager assigns the work. (In a sequential crew, leaving agent= off is
-    # an error - try it once and read what CrewAI tells you.)
-
-    # TODO 5 - the research task.
-    #          Use {question}, which is filled in by kickoff(inputs=...).
-    #          Tell it to use the Web Search tool, report exactly what came
-    #          back including source URLs, and NOT to substitute its own
-    #          knowledge if the search returned nothing.
     research_task = Task(
-        description="TODO: find evidence about {question}",
-        expected_output="TODO: say what 'done' looks like.",
+        description="Use the Web Search tool to find evidence about {question}. Report the exact findings and include source URLs. If the tool returns NO_RESULTS or SEARCH_UNAVAILABLE, say that plainly and do not invent missing facts.",
+        expected_output="A factual summary of the search results with source URLs, or an explicit statement that the tool returned NO_RESULTS or SEARCH_UNAVAILABLE.",
     )
 
-    # TODO 6 - the writing task. This is where the branch lives now.
-    #          It must produce ONE of two things:
-    #
-    #            - if the evidence supports an answer: under 180 words,
-    #              quoting at least one source URL
-    #            - if it does NOT: no answer at all. One sentence saying it
-    #              could not be verified, what is missing, and a final line
-    #              in exactly this form:
-    #                  NEXT SEARCH: <the one query you would run next>
-    #
-    #          Ask it to begin with either "VERDICT: ANSWERED" or
-    #          "VERDICT: COULD NOT VERIFY" so you can log what happened.
     write_task = Task(
-        description="TODO: write the final output for {question}",
-        expected_output="TODO: say what 'done' looks like.",
+        description="Use the evidence from the research step to either answer the question in under 180 words with at least one source URL, or say that it could not be verified and end with exactly: NEXT SEARCH: <one query>. Begin with either VERDICT: ANSWERED or VERDICT: COULD NOT VERIFY.",
+        expected_output="Either a short answer with a source URL or a refusal with a NEXT SEARCH line.",
     )
 
-    # TODO 7 - a HIERARCHICAL crew.
-    #
-    #          Two rules CrewAI will enforce, loudly:
-    #            - hierarchical needs manager_llm (or manager_agent)
-    #            - the manager must NOT also appear in agents=
-    #
-    #          Pass manager_llm=llm and CrewAI builds the manager for you.
     return Crew(
         agents=[researcher, writer],
         tasks=[research_task, write_task],
-        process=Process.sequential,   # TODO 7: change this
+        process=Process.hierarchical,
+        manager_llm=llm,
         verbose=True,
         tracing=False,
     )
@@ -185,15 +132,7 @@ def main() -> int:
     print("=" * 70)
     print(result)
 
-    # TODO 8 - log which way the crew went.
-    #
-    #          In LangGraph you read state["route_taken"], written by whichever
-    #          node actually ran. There is no such field here. The only way to
-    #          know what this crew decided is to read its final text and guess.
-    #
-    #          Write that guess below - and put one sentence about it in your
-    #          README, because it is the whole difference between the two.
-    route = "TODO"
+    route = "answered" if "VERDICT: COULD NOT VERIFY" not in result.upper() else "gap_reported"
 
     print("\n" + "=" * 70)
     print(f"ROUTE : {route}")

@@ -1,34 +1,12 @@
 """
-Module 2 Bridge Project - LangGraph STARTER
+Module 2 Bridge Project - LangGraph
 
 Build an agent that searches the web, decides whether what it found is good
 enough, and then does ONE OF TWO different things.
 
-    question
-       |
-    plan_query    (LLM)   turn the question into a good search query
-       |
-    run_search    (TOOL)  a real web call - no model in this node at all
-       |
-    assess        (LLM)   is this evidence good enough to answer honestly?
-       |
-       +--- ENOUGH -----> write_answer   answer, and cite the source URLs
-       |
-       +--- NOT_ENOUGH -> report_gap     do NOT answer. say what is missing.
-
-This is the first thing you have built where the path is not decided in
-advance. Everything before today ran the same steps in the same order every
-single time. This one asks a question and goes a different way depending on
-the answer.
-
-The search tool is already written for you in ../search_tools.py. You do not
-need an API key for it and you do not need to install anything.
-
 Run:
-    python research_langgraph_starter.py "Anthropic was founded by ex-OpenAI staff"
-    python research_langgraph_starter.py "the flurbotron 9000 was released in 2019"
-
-The second one is nonsense on purpose. Your agent must refuse it.
+    python research_langgraph.py "Anthropic was founded by ex-OpenAI staff"
+    python research_langgraph.py "the flurbotron 9000 was released in 2019"
 """
 
 from __future__ import annotations
@@ -42,7 +20,10 @@ from dotenv import find_dotenv, load_dotenv
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+for proxy_var in ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"]:
+    os.environ.pop(proxy_var, None)
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from search_tools import NO_RESULTS, SEARCH_UNAVAILABLE, web_search  # noqa: E402
 
 load_dotenv()
@@ -58,7 +39,6 @@ if not api_key:
         "then run this script again."
     )
 
-
 llm = ChatOpenAI(
     model="openai/gpt-4o-mini",
     temperature=0,
@@ -67,21 +47,18 @@ llm = ChatOpenAI(
 )
 
 
-# ---------------------------------------------------------------------------
-# STATE - the luggage that travels the route.
-# ---------------------------------------------------------------------------
 class DeskState(TypedDict):
-    question: str      # the claim or topic that came in
-    query: str         # plan_query writes here
-    evidence: str      # run_search writes here
-    verdict: str       # assess writes here  <- THIS DRIVES THE ROUTE
-    reasoning: str     # assess writes here
-    output: str        # write_answer OR report_gap writes here
-    route_taken: str   # so you can PROVE which path ran
+    question: str
+    query: str
+    evidence: str
+    verdict: str
+    reasoning: str
+    output: str
+    route_taken: str
 
 
 def plan_query(state: DeskState) -> DeskState:
-    """Node 1: turn the question into something worth searching for."""
+    """Turn the question into one short search query."""
     prompt = (
         "Turn the user question into one short web-search query. "
         "Return only the query and nothing else.\n\n"
@@ -102,13 +79,13 @@ def plan_query(state: DeskState) -> DeskState:
 
 
 def run_search(state: DeskState) -> DeskState:
-    """Node 2: the tool. There is no model call in this node at all."""
+    """Use the built-in search tool; no model call here."""
     state["evidence"] = web_search(state["query"])
     return state
 
 
 def assess(state: DeskState) -> DeskState:
-    """Node 3: is this evidence actually good enough to answer with?"""
+    """Decide whether the evidence is enough to answer honestly."""
     if state["evidence"] == NO_RESULTS:
         state["verdict"] = "NOT_ENOUGH"
         state["reasoning"] = "The search returned no relevant evidence for the question."
@@ -131,7 +108,7 @@ def assess(state: DeskState) -> DeskState:
 
 
 def read_verdict(raw: str) -> str:
-    """Pull the verdict out of the model's free text."""
+    """Read the last meaningful verdict from the model output."""
     lines = [line.strip() for line in raw.splitlines() if line.strip()]
     if not lines:
         return "NOT_ENOUGH"
@@ -145,12 +122,12 @@ def read_verdict(raw: str) -> str:
 
 
 def choose_next(state: DeskState) -> Literal["write_answer", "report_gap"]:
-    """THE ROUTER. Runs no model, writes no state. It only names the next node."""
+    """Route to the answer branch or refusal branch."""
     return "write_answer" if state["verdict"] == "ENOUGH" else "report_gap"
 
 
 def write_answer(state: DeskState) -> DeskState:
-    """Node 4a: the ENOUGH path."""
+    """Answer using only the evidence and cite a source URL."""
     prompt = (
         "Use only the evidence below to answer the question. Do not invent anything. "
         "Cite at least one source URL from the evidence. If part of the question is not covered, say so. "
@@ -164,7 +141,7 @@ def write_answer(state: DeskState) -> DeskState:
 
 
 def report_gap(state: DeskState) -> DeskState:
-    """Node 4b: the NOT_ENOUGH path. This node must NOT answer the question."""
+    """Refuse to answer when the evidence is insufficient."""
     prompt = (
         "The evidence is not enough to answer this question honestly. Write a short refusal: "
         "1) say plainly that it could not be verified, 2) list one or two things that are missing, "
@@ -198,7 +175,6 @@ def build_graph():
     )
     graph.add_edge("write_answer", END)
     graph.add_edge("report_gap", END)
-
     return graph.compile()
 
 
@@ -215,9 +191,7 @@ def run(question: str) -> DeskState:
 
 
 def main() -> int:
-    question = " ".join(sys.argv[1:]).strip() or \
-        "Anthropic was founded by former OpenAI employees"
-
+    question = " ".join(sys.argv[1:]).strip() or "Anthropic was founded by former OpenAI employees"
     result = run(question)
 
     print("=" * 70)
