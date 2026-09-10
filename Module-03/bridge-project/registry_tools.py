@@ -44,9 +44,12 @@ import io
 import json
 import os
 import re
+import ssl
 import urllib.error
 import urllib.parse
 import urllib.request
+
+import certifi
 
 NO_RECORDS = "NO_RECORDS"
 NO_SANCTIONS_MATCH = "NO_SANCTIONS_MATCH"
@@ -56,6 +59,7 @@ _UA = "JHF-Agentic-AI-Bootcamp/1.0 (student project; contact: your-email@example
 _TIMEOUT = 30
 _SDN_URL = "https://www.treasury.gov/ofac/downloads/sdn.csv"
 _SDN_CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".sdn_cache.csv")
+_SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where())
 
 
 # ===========================================================================
@@ -66,7 +70,7 @@ def _load_sdn() -> list[tuple[str, str]]:
     """The SDN list is ~5 MB. Download once, then read from disk."""
     if not os.path.exists(_SDN_CACHE):
         req = urllib.request.Request(_SDN_URL, headers={"User-Agent": _UA})
-        with urllib.request.urlopen(req, timeout=60) as r:
+        with urllib.request.urlopen(req, timeout=60, context=_SSL_CONTEXT) as r:
             with open(_SDN_CACHE, "wb") as f:
                 f.write(r.read())
 
@@ -85,6 +89,17 @@ def _normalise(name: str) -> str:
                    " fze", " aps", " gmbh", " sa", " nv", " bv"):
         s = s.replace(suffix, " ")
     return " ".join(s.split())
+
+
+def _parse_legal_name(value):
+    """Return a readable legal name from the JSON:API representation."""
+    if not value:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, dict):
+        return (value.get("name") or value.get("legalName") or "").strip()
+    return str(value).strip()
 
 
 def sanctions_screen(name: str, top: int = 5) -> str:
@@ -183,7 +198,48 @@ def gleif_lookup(legal_name: str) -> str:
     Run  python verify_tools.py  to check yourself.
     ---------------------------------------------------------------------------
     """
-    # TODO: implement. Delete the line below when you do.
-    raise NotImplementedError(
-        "gleif_lookup is yours to write - see the docstring, then run verify_tools.py"
-    )
+    name = (legal_name or "").strip()
+    if not name:
+        return NO_RECORDS
+
+    try:
+        params = urllib.parse.urlencode({"filter[entity.legalName]": name})
+        url = f"https://api.gleif.org/api/v1/lei-records?{params}"
+        req = urllib.request.Request(url, headers={"User-Agent": _UA})
+        with urllib.request.urlopen(req, timeout=30, context=_SSL_CONTEXT) as r:
+            payload = json.loads(r.read().decode("utf-8"))
+    except Exception:  # noqa: BLE001
+        return LOOKUP_UNAVAILABLE
+
+    data = payload.get("data") if isinstance(payload, dict) else None
+    if not data:
+        return NO_RECORDS
+
+    normal_input = _normalise(name)
+    exact_count = 0
+    lines = [
+        f"GLEIF results for '{name}'",
+        f"  exact match count: {sum(1 for item in data if _normalise(_parse_legal_name(item.get('attributes', {}).get('entity', {}).get('legalName'))) == normal_input)} exactly",
+    ]
+
+    for item in data:
+        attrs = item.get("attributes", {}) or {}
+        entity = attrs.get("entity", {}) or {}
+        registration = attrs.get("registration", {}) or {}
+        legal = _parse_legal_name(entity.get("legalName"))
+        country = (entity.get("legalAddress") or {}).get("country") or "unknown"
+        entity_status = entity.get("entityStatus") or "UNKNOWN"
+        reg_status = registration.get("status") or "UNKNOWN"
+        lei = item.get("id") or "unknown"
+        exact = _normalise(legal) == normal_input
+        if exact:
+            exact_count += 1
+        lines.append(
+            f"  legal name: {legal} | LEI: {lei} | country: {country} | "
+            f"entity status: {entity_status} | registration status: {reg_status} | "
+            f"exact: {'yes' if exact else 'no'}"
+        )
+
+    if exact_count == 0:
+        lines.insert(1, "  0 exactly")
+    return "\n".join(lines)
