@@ -228,7 +228,7 @@ def gleif_lookup(legal_name: str) -> str:
         registration = attrs.get("registration", {}) or {}
         legal = _parse_legal_name(entity.get("legalName"))
         country = (entity.get("legalAddress") or {}).get("country") or "unknown"
-        entity_status = entity.get("entityStatus") or "UNKNOWN"
+        entity_status = entity.get("status") or "UNKNOWN"
         reg_status = registration.get("status") or "UNKNOWN"
         lei = item.get("id") or "unknown"
         exact = _normalise(legal) == normal_input
