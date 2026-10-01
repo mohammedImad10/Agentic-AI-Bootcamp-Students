@@ -109,23 +109,32 @@ def build_context(memories: list[dict], position: str = "middle") -> list[tuple[
        position='last'  : rules -> prior turns -> MEMORIES -> question   (STEP 4)"""
     if position == "middle":
         return [("system", SYSTEM), ("system", memories_block(memories))] + PRIOR_TURNS + [("user", QUERY)]
-    # TODO (Step 4): return the same four ingredients with the memories block placed
-    # AFTER the prior turns, immediately before the question.
-    raise NotImplementedError("Step 4: build_context(position='last')")
+    if position == "last":
+        return [("system", SYSTEM)] + PRIOR_TURNS + [("system", memories_block(memories)), ("user", QUERY)]
+    raise ValueError(f"unknown context position: {position}")
 
 
 def select(memories: list[dict], k: int = 3, min_sim: float = 0.35) -> list[dict]:
-    # TODO (Step 2): memories are already sorted by similarity. Keep at most k, and only
-    # those with similarity >= min_sim. Print how many you dropped.
-    raise NotImplementedError("Step 2: select()")
+    kept = [memory for memory in memories[:k] if memory["similarity"] >= min_sim]
+    print(f"   select: kept {len(kept)}, dropped {len(memories) - len(kept)}")
+    return kept
 
 
 def compress(memories: list[dict], threshold: float = 0.70) -> list[dict]:
-    # TODO (Step 3): walk the list in order; keep a memory only if its cosine() to EVERY
-    # already-kept embedding is below `threshold`. Print each one you drop and what it duplicated.
-    # (0.70 is a measured choice for this model: true duplicates sit at 0.72-0.79, the closest
-    #  non-duplicate at 0.56. Try 0.60 afterwards and watch what happens to the three "metric" lines.)
-    raise NotImplementedError("Step 3: compress()")
+    kept = []
+    for memory in memories:
+        duplicate = next(
+            ((existing, cosine(memory["embedding"], existing["embedding"])) for existing in kept
+             if cosine(memory["embedding"], existing["embedding"]) >= threshold),
+            None,
+        )
+        if duplicate is None:
+            kept.append(memory)
+            continue
+        existing, similarity = duplicate
+        print(f"   compress: dropped '{memory['text']}' as duplicate of '{existing['text']}' (cosine {similarity:.3f})")
+    print(f"   compress: kept {len(kept)}, dropped {len(memories) - len(kept)}")
+    return kept
 
 
 # ---------------------------------------------------------------- run ----
