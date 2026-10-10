@@ -1,0 +1,8 @@
+# Your mini-project lives here while you build it — yours, not the repo's.
+my-network/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.env

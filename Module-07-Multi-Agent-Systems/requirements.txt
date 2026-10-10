@@ -1,0 +1,14 @@
+# Module 7 -- Multi-Agent Systems
+#
+# NOTHING NEW TO INSTALL. These are the exact Module 2 versions you already have.
+# A2A (Exercise 3) is plain HTTP + JSON, built into Python's standard library.
+#
+# If preflight.py says something is missing, install into the Module 2 environment:
+#     Module-02\.venv\Scripts\python.exe -m pip install -r Module-07-Multi-Agent-Systems\requirements.txt
+#
+# Python 3.12 or 3.13 only (CrewAI cannot install on 3.14).
+openai==2.52.0
+langgraph==1.2.10
+langchain-openai==1.4.1
+crewai==1.15.10
+python-dotenv==1.2.2
