@@ -1,0 +1,70 @@
+
+════════════════════════════════════════════════════════════════
+ PERSONAL FINANCE CHECK · match
+════════════════════════════════════════════════════════════════
+{
+  "base_currency": "USD",
+  "monthly_income": {
+    "amount": "4800",
+    "currency": "USD"
+  },
+  "spending_budget": {
+    "amount": "3200",
+    "currency": "USD"
+  },
+  "savings_goal": {
+    "amount": "900",
+    "currency": "USD"
+  },
+  "expenses": [
+    {
+      "category": "rent",
+      "amount": "1450",
+      "currency": "USD"
+    },
+    {
+      "category": "groceries",
+      "amount": "520",
+      "currency": "USD"
+    },
+    {
+      "category": "transport",
+      "amount": "260",
+      "currency": "USD"
+    },
+    {
+      "category": "utilities",
+      "amount": "180",
+      "currency": "USD"
+    },
+    {
+      "category": "dining",
+      "amount": "250",
+      "currency": "USD"
+    }
+  ]
+}
+☎️  No FX desk card at http://127.0.0.1:9999: <urlopen error [Errno 61] Connection refused>
+🧭 Lead requested ['spending', 'savings', 'fx']; validated team: spending, savings
+   ✍️  savings    wrote 1 line(s) (1.0 s, local)
+   ✍️  spending   wrote 1 line(s) (2.1 s, local)
+
+📋 THE WHITEBOARD
+   [savings] SAVINGS: Monthly income exceeds spending budget by 1600, allowing for potential savings beyond the goal of 900 if expenses remain controlled.
+   [spending] SPENDING: Largest categories include rent at 1450, groceries at 520, and dining at 250; notable patterns show significant allocation to housing and essential needs, with discretionary spending on dining.
+
+🧮 Python total spending: 2660.00 USD | budget: 3200.00 USD | budget remaining: 540.00 USD | actual savings: 2140.00 USD | savings goal: 900.00 USD
+🏁 DECISION: ON TRACK (computed by Python; cross-currency FX failure fails closed)
+   Monthly income exceeds the spending budget by $1,600, allowing for actual savings of $2,140, which surpasses the savings goal of $900. Major spending categories include rent ($1,450), groceries ($520), and dining ($250), with a remaining budget of $540.
+
+⏱  2 specialist(s): 2.1 s parallel; 3.1 s sequential
+
+Expected 'ON TRACK'; got 'ON TRACK'
+
+── what that cost ──────────────────────────────────────────
+  agents that worked ... 3
+  LLM calls ............ 4
+  tokens ............... 1,303   (in 1,169 / out 134)
+  money ................ $0.00026  (openai/gpt-4o-mini)
+  time ................. 5.4 s
+  note ................. FX Desk tokens and cost are reported by the desk process, not this manager.

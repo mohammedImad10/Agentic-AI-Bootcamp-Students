@@ -1,0 +1,55 @@
+
+════════════════════════════════════════════════════════════════
+ PERSONAL FINANCE CHECK · stretch
+════════════════════════════════════════════════════════════════
+{
+  "base_currency": "USD",
+  "monthly_income": {
+    "amount": "4800",
+    "currency": "USD"
+  },
+  "spending_budget": {
+    "amount": "3200",
+    "currency": "USD"
+  },
+  "savings_goal": {
+    "amount": "900",
+    "currency": "USD"
+  },
+  "expenses": [
+    {
+      "category": "rent",
+      "amount": "1600",
+      "currency": "EUR"
+    },
+    {
+      "category": "other expenses",
+      "amount": "1800",
+      "currency": "USD"
+    }
+  ]
+}
+📇 Read FX Desk card; it advertises 'fx'.
+🧭 Lead requested ['spending', 'savings', 'fx']; validated team: spending, fx
+   ✍️  spending   wrote 1 line(s) (1.9 s, local)
+   📞 fx         answered with a note (2.4 s, over A2A)
+
+📋 THE WHITEBOARD
+   [fx·A2A] FX_NOTE: The supplied rates are illustrative, not live quotes, and actual rates and fees should be checked.
+   [spending] SPENDING: Largest categories include rent in EUR and other expenses in USD; notable pattern shows significant foreign-currency exposure due to rent payments.
+
+🧮 Python total spending: 3560.00 USD | budget: 3200.00 USD | budget remaining: -360.00 USD | actual savings: 1240.00 USD | savings goal: 900.00 USD
+🏁 DECISION: OVERSPENDING (computed by Python; cross-currency FX failure fails closed)
+   The analysis indicates significant foreign-currency exposure primarily due to rent payments, with total spending amounting to 3560.00 USD, exceeding the budget of 3200.00 USD by 360.00 USD. Despite this overspending, actual savings stand at 1240.00 USD, surpassing the savings goal of 900.00 USD.
+
+⏱  2 specialist(s): 2.4 s parallel; 4.3 s sequential
+
+Expected 'OVERSPENDING'; got 'OVERSPENDING'
+
+── what that cost ──────────────────────────────────────────
+  agents that worked ... 3
+  LLM calls ............ 3
+  tokens ............... 786   (in 680 / out 106)
+  money ................ $0.00017  (openai/gpt-4o-mini)
+  time ................. 6.0 s
+  note ................. FX Desk tokens and cost are reported by the desk process, not this manager.

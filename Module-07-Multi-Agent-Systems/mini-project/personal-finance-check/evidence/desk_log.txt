@@ -1,0 +1,9 @@
+⏳ waking up CrewAI...
+
+FX Desk is open: http://127.0.0.1:9999/.well-known/agent-card.json
+Waiting for A2A calls (Ctrl+C to stop).
+
+📇 19:17:54 someone read our FX card
+📞 19:17:55 SendMessage · 674 characters
+   🤖 CrewAI FX specialist is reviewing...
+✅ TASK_STATE_COMPLETED · 1 LLM call(s) · 406 tokens · $0.00007 · 2.4 s

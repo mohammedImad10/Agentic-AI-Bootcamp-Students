@@ -1,0 +1,41 @@
+{
+  "name": "FX Desk",
+  "description": "Explains cross-currency budget conversions using the fixed assumptions supplied by the caller; does not provide live rates or financial advice.",
+  "version": "1.0.0",
+  "provider": {
+    "organization": "Personal Finance Check exercise",
+    "url": "https://example.invalid"
+  },
+  "supportedInterfaces": [
+    {
+      "url": "http://127.0.0.1:9999/",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
+    }
+  ],
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "fx-budget-note",
+      "name": "FX budget note",
+      "description": "Send a monthly budget and explicit fixed exercise rates. Get one FX_NOTE line explaining the assumptions and why real rates and fees must be verified.",
+      "tags": [
+        "fx",
+        "currency",
+        "budget"
+      ],
+      "examples": [
+        "Explain an EUR expense converted to a USD budget using caller-supplied illustrative rates."
+      ]
+    }
+  ]
+}

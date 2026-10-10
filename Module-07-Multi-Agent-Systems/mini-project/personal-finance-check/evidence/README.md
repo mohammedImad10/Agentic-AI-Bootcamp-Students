@@ -1,0 +1,1 @@
+Evidence files in this folder must be captured from actual runs. The project README has the exact commands; do not replace terminal output with reconstructed examples.
